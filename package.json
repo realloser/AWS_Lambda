@@ -1,0 +1,14 @@
+{
+  "name": "aws_lambdas_environment",
+  "version": "1.0.0",
+  "description": "Environment related aws lambda functions",
+  "main": "API_Gateway_Environment_Sources_Nodes.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "uuid": "^3.3.2"
+  }
+}
