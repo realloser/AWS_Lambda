@@ -46,7 +46,7 @@ exports.handler = (event, context, callback) => {
             return;
         }
         const mapped = res.Items && res.Items.map(rawToObject) || [];
-        doneConsole(null, {data: mapped});
+        done(null, {data: mapped});
         
     };
     
@@ -60,7 +60,7 @@ exports.handler = (event, context, callback) => {
         
         const toValue = (value) => {
             const intValue = parseInt(value);
-            if (isNaN(intValue) || -1) {
+            if (isNaN(intValue) || value === '-1') {
                 return -1;
             }
             return intValue/100;  
@@ -72,7 +72,7 @@ exports.handler = (event, context, callback) => {
             messageIndex: parseInt(seperated[1]),
             primary_temperature: toValue(seperated[2]),
             humidity: toValue(seperated[3]),
-            light_intensity: seperated[4],
+            light_intensity: parseInt(seperated[4]),
             batt: toValue(seperated[5]),
             secondary_temperature: toValue(seperated[6]),
             pressure: toValue(seperated[7]),
@@ -96,7 +96,7 @@ exports.handler = (event, context, callback) => {
     
     const scanObject = {    
         TableName: table_name,
-        Limit: 5
+        Limit: 100
         // FilterExpression: "_id < :ts",
         // ExpressionAttributeValues: {
         //     ":ts": timeStamp,
