@@ -90,10 +90,10 @@ const mapResponse = function (context, res) {
 const addRelations = function (context, item) {
     item.relations = {
         data: {
-            href: `${context.path}/nodes/${item.node}`
+            href: `${context.path}/${item.node}`
         },
         top: {
-            href: `${context.path}/nodes/${item.node}/top`
+            href: `${context.path}/${item.node}/top`
         }
 
     }
