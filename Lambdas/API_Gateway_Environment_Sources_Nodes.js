@@ -17,8 +17,6 @@ exports.handler = (event, context, callback) => {
     };
 
     const done = (err, res) => {
-        console.timeEnd('query');
-
         let response;
         if (err) {
             response = errorHandling(err);
@@ -36,8 +34,39 @@ exports.handler = (event, context, callback) => {
         callback(null, response);
     };
 
-    ddb.scan(params, done);
+    switch (event.httpMethod) {
+        case 'GET':
+            ddb.scan(params, done);
+            break;
+        default:
+            done(new Error(`Unsupported method "${event.httpMethod}"`));
+    }
+    
 };
+
+const errorHandling = (err) => {
+
+    switch (err.code) {
+        case 'ResourceNotFoundException':
+            return {
+                statusCode: 404,
+                body: 'No data found',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            };
+        default:
+            console.log('Unhandled exception', JSON.stringify(err));
+            return {
+                statusCode: 500,
+                body: `Server error, unhandled exception. Request-ID: ${err.requestId}`,
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            };
+    }
+};
+
 
 const mapResponse = function (res) {
     const source = res.Items[0];
@@ -57,7 +86,7 @@ const convertDynamoRepresentation = function (obj) {
         if (typeof value === 'object') {
             const subKeys = Object.keys(value);
             if (subKeys.length !== 1) {
-                throw `not expected value: ${JSON.stringify(value)}`;
+                return convertDynamoRepresentation(value);
             }
             switch (subKeys[0]) {
                 case 'S':
@@ -70,7 +99,7 @@ const convertDynamoRepresentation = function (obj) {
                     result[key] = convertDynamoRepresentation(value.M);
                     break;
                 default:
-                    throw 'Not supported type: ${JSON.stringify(value)}';
+                    throw `Not supported type: ${JSON.stringify(value)}`;
             }
         }
         return result;
