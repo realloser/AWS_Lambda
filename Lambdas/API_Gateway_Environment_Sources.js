@@ -20,7 +20,7 @@ exports.handler = (event, context, callback) => {
         }
     };
     const dataContext = {
-        path: event.requestContext.resourcePath
+        path: event.path
     }
 
     const done = (err, res) => {
