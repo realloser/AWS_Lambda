@@ -24,6 +24,8 @@ exports.handler = (event, context, callback) => {
     
     // const done = doneConsole;
     const done = (err, res) => {
+        console.timeEnd('query');
+
         let response;
         if (err) {
             response = errorHandling(err);
@@ -44,9 +46,9 @@ exports.handler = (event, context, callback) => {
 
 
 
-    // get the last 24 hours
+    // get the last 5 hours
     const endTime = new Date().getTime();
-    const startTime = endTime - 24 * 60 * 60 * 1000;
+    const startTime = endTime - 5 * 60 * 60 * 1000;
 
     switch (event.httpMethod) {
         case 'GET':
@@ -87,11 +89,16 @@ const queryTable = function (tableName, node_id, startTime, endTime, callback) {
     var params = {
         TableName: tableName,
         //Limit: 2,
-        KeyConditions: [
-            docClient.Condition('node', 'EQ', node_id),
-            docClient.Condition('timeStamp', 'BETWEEN', `${startTime}`, `${endTime}`)]
+        ScanIndexForward: false,
+        KeyConditions: [docClient.Condition('node', 'EQ', node_id)]
     };
+
+    params.KeyConditions.push(endTime 
+        ? docClient.Condition('timeStamp', 'BETWEEN', `${startTime}`, `${endTime}`)
+        : docClient.Condition('timeStamp', 'GE', `${startTime}`));
+
     console.log('query params', JSON.stringify(params));
+    console.time('query')
     docClient.query(params, callback);
 }
 
@@ -102,6 +109,7 @@ const mapResponse = function(node, res) {
         count: res.Count, 
     });
 };
+
 
 /* dynamoDB response
 {
