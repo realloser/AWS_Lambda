@@ -1,45 +1,196 @@
 console.log('Loading function');
 
-const doc = require('dynamodb-doc');
+// https://www.npmjs.com/package/dynamodb-doc
+var AWS = require('aws-sdk');
+var DOC = require('dynamodb-doc');
 
-const dynamo = new doc.DynamoDB();
+AWS.config.update({ region: 'eu-west-1' });
 
+var docClient = new DOC.DynamoDB();
 
-/**
- * Demonstrates a simple HTTP endpoint using API Gateway. You have full
- * access to the request and response payload, including headers and
- * status code.
- *
- * To scan a DynamoDB table, make a GET request with the TableName as a
- * query string parameter. To put, update, or delete an item, make a POST,
- * PUT, or DELETE request respectively, passing in the payload to the
- * DynamoDB API as a JSON body.
- */
 exports.handler = (event, context, callback) => {
-    //console.log('Received event:', JSON.stringify(event, null, 2));
 
-    const done = (err, res) => callback(null, {
-        statusCode: err ? '400' : '200',
-        body: err ? err.message : JSON.stringify(res),
-        headers: {
-            'Content-Type': 'application/json',
-        },
-    });
+    const doneConsole = (err, res) => {
+        if (err) {
+            console.error(err);
+        }
+
+        console.log(JSON.stringify(res));
+        callback('failed');
+    }
+
+    const table_name = 'EnvironmentData';
+    const node_id = event.pathParameters['node_id'];
+    
+    // const done = doneConsole;
+    const done = (err, res) => {
+        let response;
+        if (err) {
+            response = errorHandling(err);
+        }
+        else {
+            response = {
+                statusCode: '200',
+                body: mapResponse(node_id, res),
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            }
+        }
+
+        callback(null, response);
+    };
+
+
+
+
+    // get the last 24 hours
+    const endTime = new Date().getTime();
+    const startTime = endTime - 24 * 60 * 60 * 1000;
 
     switch (event.httpMethod) {
-        case 'DELETE':
-            dynamo.deleteItem(JSON.parse(event.body), done);
-            break;
         case 'GET':
-            dynamo.scan({ TableName: event.queryStringParameters.TableName }, done);
-            break;
-        case 'POST':
-            dynamo.putItem(JSON.parse(event.body), done);
-            break;
-        case 'PUT':
-            dynamo.updateItem(JSON.parse(event.body), done);
+            queryTable(table_name, node_id, startTime, endTime, done);
             break;
         default:
             done(new Error(`Unsupported method "${event.httpMethod}"`));
     }
 };
+
+const errorHandling = (err) => {
+
+    switch (err.code) {
+        case 'ResourceNotFoundException':
+            return {
+                statusCode: 404,
+                body: 'No data found',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            };
+        default:
+            console.log('Unhandled exception', JSON.stringify(err));
+            return {
+                statusCode: 500,
+                body: `Server error, unhandled exception. Request-ID: ${err.requestId}`,
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            };
+    }
+};
+
+const queryTable = function (tableName, node_id, startTime, endTime, callback) {
+
+    // conditions [IN, NULL, BETWEEN, LT, NOT_CONTAINS, EQ, GT, NOT_NULL, NE, LE, BEGINS_WITH, GE, CONTAINS]
+
+    var params = {
+        TableName: tableName,
+        //Limit: 2,
+        KeyConditions: [
+            docClient.Condition('node', 'EQ', node_id),
+            docClient.Condition('timeStamp', 'BETWEEN', `${startTime}`, `${endTime}`)]
+    };
+    console.log('query params', JSON.stringify(params));
+    docClient.query(params, callback);
+}
+
+const mapResponse = function(node, res) {
+    return JSON.stringify({
+        node: node,
+        data: res.Items.map(item => item.payload),
+        count: res.Count, 
+    });
+};
+
+/* dynamoDB response
+{
+  "Items": [
+    {
+      "payload": {
+        "timeStamp": 1535914798040,
+        "primary_temperature": 28.2,
+        "node": "B9FC4586",
+        "batt": -1,
+        "secondary_temperature": 29,
+        "messageIndex": 1027,
+        "msgid": "e1061554.33ed48",
+        "humidity": 36.9,
+        "light_intensity": 0,
+        "pressure": 95706.81
+      },
+      "node": "B9FC4586",
+      "timeStamp": "1535914798040"
+    },
+    {
+      "payload": {
+        "timeStamp": 1535914918022,
+        "primary_temperature": 28.2,
+        "node": "B9FC4586",
+        "batt": -1,
+        "secondary_temperature": 28.88,
+        "messageIndex": 1028,
+        "msgid": "71bcd735.08c278",
+        "humidity": 36.6,
+        "light_intensity": 0,
+        "pressure": 95702.69
+      },
+      "node": "B9FC4586",
+      "timeStamp": "1535914918022"
+    }
+  ],
+  "Count": 2,
+  "ScannedCount": 2,
+  "LastEvaluatedKey": {
+    "node": "B9FC4586",
+    "timeStamp": "1535914918022"
+  }
+}
+*/
+
+/* event example
+{
+    "resource": "/sources/{source_id}/nodes/{node_id}",
+    "path": "/sources/thesourceid/nodes/thenodeid",
+    "httpMethod": "GET",
+    "headers": null,
+    "queryStringParameters": {
+        "query1": "aba",
+        "query2": "baba"
+    },
+    "pathParameters": {
+        "source_id": "thesourceid",
+        "node_id": "B9FC4586"
+    },
+    "stageVariables": null,
+    "requestContext": {
+        "path": "/sources/{source_id}/nodes/{node_id}",
+        "accountId": "794552060080",
+        "resourceId": "533zqp",
+        "stage": "test-invoke-stage",
+        "requestId": "984b9077-af9f-11e8-a8b3-9314f36fb329",
+        "identity": {
+            "cognitoIdentityPoolId": null,
+            "cognitoIdentityId": null,
+            "apiKey": "test-invoke-api-key",
+            "cognitoAuthenticationType": null,
+            "userArn": "arn:aws:iam::794552060080:root",
+            "apiKeyId": "test-invoke-api-key-id",
+            "userAgent": "aws-internal/3 aws-sdk-java/1.11.347 Linux/4.9.110-0.1.ac.201.71.329.metal1.x86_64 Java_HotSpot(TM)_64-Bit_Server_VM/25.172-b31 java/1.8.0_172",
+            "accountId": "794552060080",
+            "caller": "794552060080",
+            "sourceIp": "test-invoke-source-ip",
+            "accessKey": "ASIA3R7X6JCYEDYT73SI",
+            "cognitoAuthenticationProvider": null,
+            "user": "794552060080"
+        },
+        "resourcePath": "/sources/{source_id}/nodes/{node_id}",
+        "httpMethod": "GET",
+        "extendedRequestId": "Mp6IwFgnDoEFW1w=",
+        "apiId": "zjpehz8xi5"
+    },
+    "body": null,
+    "isBase64Encoded": false
+}
+
+*/
