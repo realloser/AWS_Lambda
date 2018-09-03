@@ -1,107 +1,78 @@
 console.log('Loading function');
 
-const doc = require('dynamodb-doc');
+// Load the AWS SDK for Node.js
+var AWS = require('aws-sdk');
+// Set the region 
+AWS.config.update({ region: 'eu-west-1' });
 
-const dynamo = new doc.DynamoDB();
+// Create DynamoDB service object
+var ddb = new AWS.DynamoDB({ apiVersion: '2012-08-10' });
 
-
-/**
- * Demonstrates a simple HTTP endpoint using API Gateway. You have full
- * access to the request and response payload, including headers and
- * status code.
- *
- * To scan a DynamoDB table, make a GET request with the TableName as a
- * query string parameter. To put, update, or delete an item, make a POST,
- * PUT, or DELETE request respectively, passing in the payload to the
- * DynamoDB API as a JSON body.
- */
 exports.handler = (event, context, callback) => {
-    //console.log('Received event:', JSON.stringify(event, null, 2));
 
-/*
-{
-      "data_raw": {
-        "type": "Buffer",
-        "data": [
-          70,
-          65,
-          50,
-          52,
-          67,
-          50,
-          65,
-          51,
-          124,
-          50,
-          51
-        ]
-      },
-      "_id": "1535547253418"
-    }
-*/
+    const table_name = 'EnvironmentSources';
 
-    const handleScanResult = (err, res) => {
+    var params = {
+        TableName: table_name
+    };
+
+    const done = (err, res) => {
+        console.timeEnd('query');
+
+        let response;
         if (err) {
-            done(err);
-            return;
+            response = errorHandling(err);
         }
-        const mapped = res.Items && res.Items.map(rawToObject) || [];
-        done(null, {data: mapped});
-        
-    };
-    
-    const rawToObject = (entry) => {
-        const timeStamp = parseInt(entry._id);
-        const buf = new Buffer(entry.data_raw, 'base64)');
-        const values = buf.toString();
-        console.log(JSON.stringify(values));
-        const seperated = values.split('|')
-            .filter(v => Boolean(v)); // filter out dummy values
-        
-        const toValue = (value) => {
-            const intValue = parseInt(value);
-            if (isNaN(intValue) || value === '-1') {
-                return -1;
+        else {
+            response = {
+                statusCode: '200',
+                body: mapResponse(res),
+                headers: {
+                    'Content-Type': 'application/json',
+                }
             }
-            return intValue/100;  
-        };
-        
-        const returnValue = {
-            timeStamp: timeStamp,
-            node: seperated[0],
-            messageIndex: parseInt(seperated[1]),
-            primary_temperature: toValue(seperated[2]),
-            humidity: toValue(seperated[3]),
-            light_intensity: parseInt(seperated[4]),
-            batt: toValue(seperated[5]),
-            secondary_temperature: toValue(seperated[6]),
-            pressure: toValue(seperated[7]),
-        };
-        return returnValue
-    }
-    
-    const doneConsole = (err, res) => console.log(JSON.stringify(res));
+        }
 
-    
-    const done = (err, res) => callback(null, {
-        statusCode: err ? '400' : '200',
-        body: err ? err.message : JSON.stringify(res),
-        headers: {
-            'Content-Type': 'application/json',
-        },
-    });
-    
-    const table_name = 'TestIoT';
-    // const timeStamp = new Date(Date.now() - (24 * 60 * 60 * 1000));
-    
-    const scanObject = {    
-        TableName: table_name,
-        Limit: 100
-        // FilterExpression: "_id < :ts",
-        // ExpressionAttributeValues: {
-        //     ":ts": timeStamp,
-        // }
+        callback(null, response);
     };
-    dynamo.scan(scanObject, handleScanResult);
 
+    ddb.scan(params, done);
 };
+
+const mapResponse = function (res) {
+    const source = res.Items[0];
+    const data = source.nodes;
+    const response = {
+        source: source.source,
+        displayName: source.display_name,
+        data: data,
+        count: data.length
+    };
+    return JSON.stringify(convertDynamoRepresentation(response));
+};
+
+const convertDynamoRepresentation = function (obj) {
+    return Object.keys(obj).reduce((result, key) => {
+        const value = obj[key];
+        if (typeof value === 'object') {
+            const subKeys = Object.keys(value);
+            if (subKeys.length !== 1) {
+                throw `not expected value: ${JSON.stringify(value)}`;
+            }
+            switch (subKeys[0]) {
+                case 'S':
+                    result[key] = value.S;
+                    break;
+                case 'N':
+                    result[key] = Number.parseFloat(value.N);
+                    break;
+                case 'M':
+                    result[key] = convertDynamoRepresentation(value.M);
+                    break;
+                default:
+                    throw 'Not supported type: ${JSON.stringify(value)}';
+            }
+        }
+        return result;
+    }, {})
+}
