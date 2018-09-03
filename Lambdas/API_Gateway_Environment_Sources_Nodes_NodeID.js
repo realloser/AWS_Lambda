@@ -22,7 +22,7 @@ exports.handler = (event, context, callback) => {
     const queryContext = {
         tableName: 'EnvironmentData',
         node: event.pathParameters['node_id'],
-        endTime: new Date().getTime() - 5 * 60 * 60 * 1000,
+        startTime: new Date().getTime() - 5 * 60 * 60 * 1000,
     };
 
     if ('proxy' in event.pathParameters) {
@@ -51,11 +51,6 @@ exports.handler = (event, context, callback) => {
 
         callback(null, response);
     };
-
-
-
-
-
 
     switch (event.httpMethod) {
         case 'GET':
