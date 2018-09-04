@@ -17,7 +17,7 @@ exports.handler = (event, context, callback) => {
     };
 
     const dataContext = {
-        path: event.path
+        path: buildBaseURL(event)
     }
 
     const done = (err, res) => {
@@ -46,8 +46,12 @@ exports.handler = (event, context, callback) => {
         default:
             done(new Error(`Unsupported method "${event.httpMethod}"`));
     }
-    
+
 };
+
+const buildBaseURL = function (event) {
+    return `${event.headers["X-Forwarded-Proto"]}://${event.headers.Host}${event.requestContext.path}`;
+}
 
 const errorHandling = (err) => {
 
@@ -73,15 +77,22 @@ const errorHandling = (err) => {
 };
 
 const mapResponse = function (context, res) {
-    const source = convertDynamoRepresentation(res.Items[0]);
-    const data = Object.keys(source.nodes)
-        .map(k => Object.assign({node: k}, k[k]))
-        .map(n => addRelations(context, n));
+    const sources = res.Items
+        .map(convertDynamoRepresentation);
+
+    const dataCollection = sources.map((s) => {
+        const nodes = Object.keys(s.nodes)
+            .map(k => Object.assign({ node: k }, k[k]))
+            .map(n => addRelations(context, n));
+        return {
+            source: s.source,
+            displayName: s.display_name,
+            nodes: nodes
+        };
+    });
     const response = {
-        source: source.source,
-        displayName: source.display_name,
-        data: data,
-        count: data.length
+        data: dataCollection,
+        count: dataCollection.length
     };
     return JSON.stringify(response);
 };
@@ -165,6 +176,63 @@ const convertDynamoRepresentation = function (obj) {
         "resourcePath": "/sources/{source_id}/nodes",
         "httpMethod": "GET",
         "extendedRequestId": "MqowyEoujoEFv-g=",
+        "apiId": "zjpehz8xi5"
+    },
+    "body": null,
+    "isBase64Encoded": false
+}
+
+*/
+
+/* API Gateway event
+
+{
+    "resource": "/sources/{source_id}/nodes",
+    "path": "/sources/aa/nodes/",
+    "httpMethod": "GET",
+    "headers": {
+        "Accept": "",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Accept-Language": "en,de-CH;q=0.9,de;q=0.8,en-NZ;q=0.7",
+        "Cache-Control": "no-cache",
+        "Host": "zjpehz8xi5.execute-api.eu-west-1.amazonaws.com",
+        "Postman-Token": "d035f7cb-ba81-411c-f36d-cfcae36ac631",
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/68.0.3440.106 Safari/537.36",
+        "X-Amzn-Trace-Id": "Root=1-5b8ecdf9-78631c94f3426886d10b139b",
+        "X-Forwarded-For": "5.149.17.131",
+        "X-Forwarded-Port": "443",
+        "X-Forwarded-Proto": "https"
+    },
+    "queryStringParameters": null,
+    "pathParameters": {
+        "source_id": "aa"
+    },
+    "stageVariables": null,
+    "requestContext": {
+        "resourceId": "4cqbn3",
+        "resourcePath": "/sources/{source_id}/nodes",
+        "httpMethod": "GET",
+        "extendedRequestId": "MtUfCHyojoEF95g=",
+        "requestTime": "04/Sep/2018:18:24:57 +0000",
+        "path": "/V1/sources/aa/nodes/",
+        "accountId": "794552060080",
+        "protocol": "HTTP/1.1",
+        "stage": "V1",
+        "requestTimeEpoch": 1536085497862,
+        "requestId": "d3f3aaef-b06f-11e8-b5d8-a990f62a4c86",
+        "identity": {
+            "cognitoIdentityPoolId": null,
+            "accountId": null,
+            "cognitoIdentityId": null,
+            "caller": null,
+            "sourceIp": "5.149.17.131",
+            "accessKey": null,
+            "cognitoAuthenticationType": null,
+            "cognitoAuthenticationProvider": null,
+            "userArn": null,
+            "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/68.0.3440.106 Safari/537.36",
+            "user": null
+        },
         "apiId": "zjpehz8xi5"
     },
     "body": null,

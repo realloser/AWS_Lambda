@@ -20,7 +20,7 @@ exports.handler = (event, context, callback) => {
         }
     };
     const dataContext = {
-        path: event.path
+        path: buildBaseURL(event)
     }
 
     const done = (err, res) => {
@@ -73,6 +73,10 @@ const errorHandling = (err) => {
             };
     }
 };
+
+const buildBaseURL = function (event) {
+    return `${event.headers["X-Forwarded-Proto"]}://${event.headers.Host}${event.requestContext.path}`;
+}
 
 const mapResponse = function (context, res) {
     const data = res.Items
