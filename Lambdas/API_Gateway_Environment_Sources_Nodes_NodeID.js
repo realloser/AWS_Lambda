@@ -45,6 +45,8 @@ exports.handler = (event, context, callback) => {
                 body: mapResponse(queryContext, res),
                 headers: {
                     'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*',
+                    'Access-Control-Allow-Credentials': 'true',
                 }
             }
         }

@@ -32,6 +32,8 @@ exports.handler = (event, context, callback) => {
                 body: mapResponse(dataContext, res),
                 headers: {
                     'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*',
+                    'Access-Control-Allow-Credentials': 'true',
                 }
             }
         }
@@ -50,6 +52,9 @@ exports.handler = (event, context, callback) => {
 };
 
 const buildBaseURL = function (event) {
+    if (!event.headers || !("X-Forwarded-Proto" in event.headers)) {
+        return event.requestContext.path;
+    }
     return `${event.headers["X-Forwarded-Proto"]}://${event.headers.Host}${event.requestContext.path}`;
 }
 
