@@ -8,16 +8,16 @@ AWS.config.update({ region: 'eu-west-1' });
 // Create DynamoDB service object
 var ddb = new AWS.DynamoDB({ apiVersion: '2012-08-10' });
 
+// https://www.npmjs.com/package/dynamodb-doc
+var DOC = require('dynamodb-doc');
+var docClient = new DOC.DynamoDB();
+
 exports.handler = (event, context, callback) => {
 
-    const table_name = 'EnvironmentSources';
-
-    var params = {
-        TableName: table_name
-    };
-
     const dataContext = {
-        path: buildBaseURL(event)
+        tableName: 'EnvironmentSources',
+        path: buildBaseURL(event),
+        source: event.pathParameters.source_id
     }
 
     const done = (err, res) => {
@@ -43,7 +43,7 @@ exports.handler = (event, context, callback) => {
 
     switch (event.httpMethod) {
         case 'GET':
-            ddb.scan(params, done);
+            queryTable(dataContext, done);
             break;
         default:
             done(new Error(`Unsupported method "${event.httpMethod}"`));
@@ -81,9 +81,24 @@ const errorHandling = (err) => {
     }
 };
 
+
+const queryTable = function (context, callback) {
+
+    // conditions [IN, NULL, BETWEEN, LT, NOT_CONTAINS, EQ, GT, NOT_NULL, NE, LE, BEGINS_WITH, GE, CONTAINS]
+
+    var params = {
+        TableName: context.tableName,
+        // ScanIndexForward: false,
+        KeyConditions: [docClient.Condition('source', 'EQ', context.source)],
+    };
+
+    console.log('query params', JSON.stringify(params));
+    console.time('query')
+    docClient.query(params, callback);
+}
+
 const mapResponse = function (context, res) {
-    const sources = res.Items
-        .map(convertDynamoRepresentation);
+    const sources = res.Items;
 
     const dataCollection = sources.map((s) => {
         const nodes = Object.keys(s.nodes)
